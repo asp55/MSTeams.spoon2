@@ -1,0 +1,6 @@
+{
+    "name": "MSTeams",
+    "author": "Andrew Parnell <aparnell@gmail.com>",
+    "version": "0.0.1",
+    "description": "Interact with Microsoft Teams via the local websocket API"
+}
