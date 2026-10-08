@@ -83,6 +83,8 @@ let closedCount = 0;
 
 
 function connectToTeams() {
+    if(!running) return;
+
     Logger.log(`connectToTeams()`);
 
     // Increment the connection ID before closing, so any callbacks from the
@@ -115,10 +117,11 @@ function connectToTeams() {
             }
         }
     }
-    
+
     const onTeamsOpen = ()=>{
         if(myId === teamsConnectionId) {
             closedCount = 0;
+            teamsPairing = false;
             Logger.debug(`Connected to Teams local API`);
         }
     }
@@ -248,6 +251,10 @@ MSTeams.stop = function() {
 
     return module.exports;
 };
+
+MSTeams.restart = function() {
+    return MSTeams.stop().start();
+}
 
 MSTeams.onUpdate = function (callback) {
     if(typeof callback === 'function') {
