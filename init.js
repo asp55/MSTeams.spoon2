@@ -81,82 +81,6 @@ function sendRequest(msg) {
 
 let closedCount = 0;
 
-function onTeamsClose(code, reason) {
-    Logger.log(`Teams WebSocket Closed. {code:${code}, reason:${reason}`);
-    teamsWebsocket = null;
-    teamsPairing = false;
-    if(running) {
-        closedCount++;
-        if(closedCount > 3) {
-            Logger.warn("Teams WebSocket closed multiple times in a row")
-            Logger.warn("This likely means this app was blocked from the Third-party app API in teams.")
-            Logger.warn("Go to Settings > Privacy > Third-party app API > Manage API and remove the application from block.")
-            Logger.warn("Then restart this spoon.")
-        }
-        else {
-            Logger.info("Teams not available, retrying in 5 seconds");
-            hs.timer.doAfter(5, connectToTeams);
-        }
-    }
-
-}
-function onTeamsOpen() {
-    closedCount = 0;
-    Logger.debug(`Connected to Teams local API`);
-}
-
-function onTeamsMessage(message) {
-    Logger.debug(`Teams WebSocket Received`, message);
-
-    try {
-        const parsed = JSON.parse(message);
-
-        if(parsed.tokenRefresh) {
-            Logger.debug("Teams token refreshed");
-            hs.userdefaults.set("MSTeams.teamsToken", parsed.tokenRefresh)
-        }
-
-        if(parsed.meetingUpdate) {
-            if(parsed.meetingUpdate.meetingPermissions) {
-                meetingPermissions = parsed.meetingUpdate.meetingPermissions;
-                Logger.debug("Got new meeting permissions", meetingPermissions);
-
-                if(parsed.meetingUpdate.meetingPermissions.canPair && !teamsPairing) {
-                    Logger.debug("Sending pairing request");
-                    teamsPairing = true;
-                    MSTeams.pair();
-                }
-            }
-
-            if(parsed.meetingUpdate.meetingState) {
-                meetingState = parsed.meetingUpdate.meetingState;
-                Logger.debug("Got new meeting state", meetingState);
-            }
-
-            updateCallback();
-        }
-
-        if(parsed.response && parsed.response === "Pairing response resulted in no action") {
-            Logger.debug("Didn't pair. Will try again next meeting.");
-            teamsPairing = false
-        }
-    }
-    catch(e) {
-        Logger.warn("Failed to parse Teams message: ", message);
-    }
-
-
-
-}
-function onTeamsError(err) {
-    Logger.log(`Teams WebSocket Error`, err);
-
-    teamsWebsocket = null;
-    if(running) {
-        Logger.debug("Teams not available, retrying in 30 seconds")
-        hs.timer.doAfter(30, connectToTeams);
-    }
-}
 
 function connectToTeams() {
     Logger.log(`connectToTeams()`);
@@ -170,11 +94,101 @@ function connectToTeams() {
         teamsWebsocket = null;
     }
 
+    const onTeamsClose = (code, reason)=>{
+        if(myId === teamsConnectionId) {
+            Logger.log(`Teams WebSocket Closed. {code:${code}, reason:${reason}`);
+            teamsWebsocket = null;
+            teamsPairing = false;
+            if(running) {
+                closedCount++;
+                if(closedCount > 3) {
+                    Logger.warn("Teams WebSocket closed multiple times in a row")
+                    Logger.warn("This likely means this app was blocked from the Third-party app API in teams.")
+                    Logger.warn("Go to Settings > Privacy > Third-party app API > Manage API and remove the application from block.")
+                    Logger.warn("Then restart this spoon.")
+                    MSTeams.stop();
+                }
+                else {
+                    Logger.info("Teams not available, retrying in 5 seconds");
+                    hs.timer.doAfter(5, connectToTeams);
+                }
+            }
+        }
+    }
+    
+    const onTeamsOpen = ()=>{
+        if(myId === teamsConnectionId) {
+            closedCount = 0;
+            Logger.debug(`Connected to Teams local API`);
+        }
+    }
+
+    const onTeamsMessage = (message)=>{
+        if(myId === teamsConnectionId) {
+            Logger.debug(`Teams WebSocket Received`, message);
+
+            try {
+                const parsed = JSON.parse(message);
+
+                if(parsed.tokenRefresh) {
+                    Logger.debug("Teams token refreshed");
+                    hs.userdefaults.set("MSTeams.teamsToken", parsed.tokenRefresh)
+                }
+
+                if(parsed.meetingUpdate) {
+                    if(parsed.meetingUpdate.meetingPermissions) {
+                        meetingPermissions = parsed.meetingUpdate.meetingPermissions;
+                        Logger.debug("Got new meeting permissions", meetingPermissions);
+
+                        if(parsed.meetingUpdate.meetingPermissions.canPair && !teamsPairing) {
+                            Logger.debug("Sending pairing request");
+                            teamsPairing = true;
+                            MSTeams.pair();
+                        }
+                    }
+
+                    if(parsed.meetingUpdate.meetingState) {
+                        meetingState = parsed.meetingUpdate.meetingState;
+                        Logger.debug("Got new meeting state", meetingState);
+                    }
+
+                    updateCallback();
+                }
+
+                if(parsed.response && parsed.response === "Pairing response resulted in no action") {
+                    Logger.debug("Didn't pair. Will try again next meeting.");
+                    teamsPairing = false
+                }
+            }
+            catch(e) {
+                Logger.warn("Failed to parse Teams message: ", message);
+            }
+
+
+
+        }
+    }
+
+    const onTeamsError = (err)=>{
+        if(myId === teamsConnectionId) {
+            Logger.log(`Teams WebSocket Error`, err);
+
+            teamsWebsocket = null;
+            if(running) {
+                Logger.debug("Teams not available, retrying in 30 seconds")
+                hs.timer.doAfter(30, connectToTeams);
+            }
+        }
+    }
+
+
     const token = hs.userdefaults.get("MSTeams.teamsToken") ?? "";
     const manufacturer = "Hammerspoon2";
     const device = "MSTeams.spoon2";
     const app = "MSTeams.spoon2";
     const url = `ws://localhost:8124?token=${token}&protocol-version=2.0.0&manufacturer=${manufacturer}&device=${device}&app=${app}&app-version=${MSTeams.version}`;
+
+    
 
     teamsWebsocket = hs.http.openWebSocket(url)
         .setOpenCallback(onTeamsOpen)
@@ -491,6 +505,8 @@ MSTeams.customRequest = function (action, parameters) {
     if(canAct()) {
         sendRequest({action:action, parameters:parameters ?? {}})
     }
+    
+    return module.exports;
 }
 
 //-----------------------------------------
