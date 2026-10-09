@@ -1,4 +1,4 @@
-# MSTeams.spoon
+# MSTeams.spoon2
 A spoon to interact with the Microsoft Teams local websocket API
 
 # Enable the 3rd party api
