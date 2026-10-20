@@ -85,7 +85,7 @@ let closedCount = 0;
 function connectToTeams() {
     if(!running) return;
 
-    Logger.log(`connectToTeams()`);
+    Logger.debug(`connectToTeams()`);
 
     // Increment the connection ID before closing, so any callbacks from the
     // previous connection are ignored even if close() fires synchronously.
@@ -174,7 +174,7 @@ function connectToTeams() {
 
     const onTeamsError = (err)=>{
         if(myId === teamsConnectionId) {
-            Logger.log(`Teams WebSocket Error`, err);
+            Logger.error(`Teams WebSocket Error`, err);
 
             teamsWebsocket = null;
             if(running) {
@@ -227,7 +227,7 @@ MSTeams.init = function () {
 };
 
 MSTeams.start = function () {
-    Logger.log("start()");
+    Logger.debug("start()");
     if(!running) {
         running = true;
         if(!teamsWebsocket) connectToTeams();
@@ -240,7 +240,7 @@ MSTeams.start = function () {
 }
 
 MSTeams.stop = function() {
-    Logger.log("stop()");
+    Logger.debug("stop()");
 
     running = false;
     closedCount = 0;
