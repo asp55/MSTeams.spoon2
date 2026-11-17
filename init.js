@@ -69,6 +69,12 @@ function disconnectFromTeams() {
 
 let requestID = 0;
 function sendRequest(msg) {
+    // HSWebSocket.send() requires readyState === 1 (open)
+    if(!teamsWebsocket || teamsWebsocket.readyState !== 1) {
+        Logger.warn("Teams WebSocket is not open yet, request not sent", msg.action);
+        return;
+    }
+
     requestID++;
     const requestMSG = JSON.stringify({
         requestId: requestID,
@@ -76,7 +82,7 @@ function sendRequest(msg) {
         parameters: msg.parameters ?? {}
     })
     Logger.debug("sendRequest", requestMSG);
-    if(teamsWebsocket) teamsWebsocket.send(requestMSG);
+    teamsWebsocket.send(requestMSG);
 }
 
 let closedCount = 0;
@@ -185,15 +191,21 @@ function connectToTeams() {
     }
 
 
-    const token = hs.userdefaults.get("MSTeams.teamsToken") ?? "";
+    const token = hs.http.encodeForQuery(hs.userdefaults.get("MSTeams.teamsToken") ?? "");
     const manufacturer = "Hammerspoon2";
     const device = "MSTeams.spoon2";
     const app = "MSTeams.spoon2";
-    const url = `ws://localhost:8124?token=${token}&protocol-version=2.0.0&manufacturer=${manufacturer}&device=${device}&app=${app}&app-version=${MSTeams.version}`;
+    const url = `ws://localhost:8124?token=${token}&protocol-version=2.0.0&manufacturer=${manufacturer}&device=${device}&app=${app}&app-version=${String(MSTeams.version)}`;
 
-    
+    // openWebSocket returns null if the URL is invalid
+    teamsWebsocket = hs.http.openWebSocket(url);
 
-    teamsWebsocket = hs.http.openWebSocket(url)
+    if(!teamsWebsocket) {
+        Logger.error("Failed to create Teams WebSocket: invalid URL");
+        return;
+    }
+
+    teamsWebsocket
         .setOpenCallback(onTeamsOpen)
         .setMessageCallback(onTeamsMessage)
         .setCloseCallback(onTeamsClose)
@@ -220,7 +232,7 @@ const MSTeams = {
 };
 
 MSTeams.init = function () {
-    // Called automatically by hs.loadSpoon(). author/description/version are already set on
+    // Called automatically by hs.spoons.load(). author/description/version are already set on
     // `this` by this point - safe to log or read, but this could run more than once, so avoid
     // anything that shouldn't happen twice.
     Logger.log(`v${this.version} initialized`)
